@@ -93,11 +93,48 @@ public class MainActivity extends Activity {
 
         setContentView(mainLayout);
 
-        if (prefs.getString("key", null) != null) {
-            showMainTabs();
+        String savedKey = prefs.getString("key", null);
+        if (savedKey != null) {
+            checkKeyStatus(savedKey);
         } else {
             showLoginScreen();
         }
+    }
+
+    private void checkKeyStatus(String key) {
+        JSONObject json = new JSONObject();
+        try {
+            json.put("key", key);
+            json.put("device_id", Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID));
+        } catch (Exception e) { e.printStackTrace(); }
+
+        RequestBody body = RequestBody.create(json.toString(), MediaType.parse("application/json"));
+        Request request = new Request.Builder().url(SERVER_URL + "/api/check_key").post(body).build();
+
+        client.newCall(request).enqueue(new Callback() {
+            @Override public void onFailure(Call call, IOException e) {
+                runOnUiThread(() -> showLoginScreen());
+            }
+            @Override public void onResponse(Call call, Response response) throws IOException {
+                String resp = response.body().string();
+                runOnUiThread(() -> {
+                    try {
+                        JSONObject j = new JSONObject(resp);
+                        if (j.optBoolean("ok", false)) {
+                            prefs.edit().putLong("expires", j.optLong("expires", 0)).apply();
+                            showMainTabs();
+                        } else {
+                            String error = j.optString("error", "unknown");
+                            if (error.equals("revoked")) {
+                                prefs.edit().remove("key").apply();
+                                Toast.makeText(MainActivity.this, "Ключ отозван!", Toast.LENGTH_LONG).show();
+                            }
+                            showLoginScreen();
+                        }
+                    } catch (Exception e) { showLoginScreen(); }
+                });
+            }
+        });
     }
 
     private void selectTab(int index) {
@@ -188,7 +225,6 @@ public class MainActivity extends Activity {
 
     private void showHomeTab() {
         contentLayout.removeAllViews();
-
         TextView tvLogo = new TextView(this);
         tvLogo.setText("ZTai");
         tvLogo.setTextSize(32);
@@ -271,7 +307,6 @@ public class MainActivity extends Activity {
             selectTab(3); 
             return;
         }
-
         launchBotUI();
     }
 
