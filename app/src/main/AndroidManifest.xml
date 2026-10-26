@@ -1,67 +1,56 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+    package="com.ztai.app">
 
-    <!-- Интернет и сеть -->
-    <uses-permission android:name="android.permission.INTERNET"/>
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- Разрешения для сети -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- Foreground service для работы бота в фоне -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <!-- Разрешения для плавающего окна -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
-    <!-- Плавающее меню поверх Brawl Stars -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
-
-    <!-- Для скриншотов экрана (MediaProjection) -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"/>
-
-    <!-- Для определения телефона -->
-    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
-
-    <!-- Стилер (только инфа о телефоне + гео) -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- Разрешения для фоновой работы -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.CAPTURE_VIDEO_OUTPUT" />
 
     <application
-        android:label="ZTai"
+        android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
-        android:allowBackup="false"
-        android:usesCleartextTraffic="true"
-        android:theme="@android:style/Theme.Material.Light">
+        android:label="ZTai"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
-        <!-- Главный экран (ввод ключа) -->
-        <activity android:name=".MainActivity"
-            android:exported="true"
-            android:excludeFromRecents="true"
-            android:launchMode="singleTask">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- Сервис бота (работает в фоне) -->
-        <service android:name=".BotService"
+        <service
+            android:name=".FloatingService"
+            android:exported="false" />
+
+        <service
+            android:name=".BotService"
             android:exported="false"
-            android:foregroundServiceType="dataSync|mediaProjection"/>
+            android:foregroundServiceType="mediaProjection|specialUse" />
 
-        <!-- Плавающее меню поверх Brawl Stars -->
-        <service android:name=".FloatingService"
-            android:exported="false"/>
-
-        <!-- Accessibility для тапов в игре -->
-        <service android:name=".TapService"
+        <service
+            android:name=".TapService"
             android:exported="true"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService"/>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
             </intent-filter>
             <meta-data
                 android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_service_config"/>
+                android:resource="@xml/accessibility_service_config" />
         </service>
 
     </application>
