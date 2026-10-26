@@ -200,7 +200,6 @@ public class MainActivity extends Activity {
                                     .putLong("expires", json.optLong("expires", 0))
                                     .apply();
                             
-                            startService(new Intent(MainActivity.this, BotService.class));
                             showStatusScreen();
                         } else {
                             String error = json.optString("error", "unknown");
@@ -231,6 +230,7 @@ public class MainActivity extends Activity {
     }
 
     private void launchBotUI() {
+        startService(new Intent(this, BotService.class));
         startService(new Intent(this, FloatingService.class));
         finish();
     }
