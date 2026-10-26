@@ -111,7 +111,7 @@ public class MainActivity extends Activity {
 
         RequestBody body = RequestBody.create(json.toString(), MediaType.parse("application/json; charset=utf-8"));
         Request request = new Request.Builder()
-                .url(SERVER_URL + "/api/activate")
+                .url(SERVER_URL + "/api/check_key")
                 .post(body)
                 .build();
 
