@@ -226,4 +226,15 @@ public class MainActivity extends Activity {
             Settings.Secure.ANDROID_ID);
         return id != null ? id : "unknown";
     }
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 101) {
+            if (android.provider.Settings.canDrawOverlays(this)) {
+                launchBotUI();
+            } else {
+                tvStatus.setText("Нужно разрешение на оверлей");
+            }
+        }
+    }
 }
