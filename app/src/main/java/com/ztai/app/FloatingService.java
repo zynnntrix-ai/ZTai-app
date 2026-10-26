@@ -6,26 +6,25 @@ import android.os.IBinder;
 
 public class FloatingService extends Service {
 
-    private FloatingView view;
+    private FloatingView floatingView;
 
     @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        if (view == null) {
-            view = new FloatingView(this);
-            view.show();
-        }
-        return START_STICKY;
+    public void onCreate() {
+        super.onCreate();
+        floatingView = new FloatingView(this);
+        floatingView.show();
     }
 
     @Override
     public void onDestroy() {
-        if (view != null) {
-            view.hide();
-            view = null;
+        if (floatingView != null) {
+            floatingView.hide();
         }
         super.onDestroy();
     }
 
     @Override
-    public IBinder onBind(Intent intent) { return null; }
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
 }
