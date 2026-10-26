@@ -20,6 +20,7 @@ public class FloatingView {
     private final LinearLayout rootLayout;
     private final WindowManager.LayoutParams params;
     private boolean isMenuOpen = false;
+    private boolean isBotRunning = false;
     private final LinearLayout menuLayout;
     private final TextView buttonView;
 
@@ -27,12 +28,10 @@ public class FloatingView {
         this.context = context;
         this.windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
 
-        // Главный контейнер (кнопка)
         rootLayout = new LinearLayout(context);
         rootLayout.setOrientation(LinearLayout.VERTICAL);
         rootLayout.setGravity(Gravity.CENTER);
 
-        // Круглая кнопка
         buttonView = new TextView(context);
         buttonView.setText("Z");
         buttonView.setTextSize(24);
@@ -50,12 +49,23 @@ public class FloatingView {
         buttonView.setLayoutParams(btnParams);
         rootLayout.addView(buttonView);
 
-        // Выпадающее меню (скрыто по умолчанию)
         menuLayout = new LinearLayout(context);
         menuLayout.setOrientation(LinearLayout.VERTICAL);
         menuLayout.setVisibility(View.GONE);
-        menuLayout.setBackgroundColor(Color.parseColor("#CC0A0E1A"));
+        
+        GradientDrawable menuBg = new GradientDrawable();
+        menuBg.setShape(GradientDrawable.RECTANGLE);
+        menuBg.setColor(Color.parseColor("#E60A0E1A"));
+        menuBg.setCornerRadius(20);
+        menuBg.setStroke(2, Color.parseColor("#00D4FF"));
+        menuLayout.setBackground(menuBg);
         menuLayout.setPadding(20, 20, 20, 20);
+        
+        LinearLayout.LayoutParams menuParams = new LinearLayout.LayoutParams(
+                (int)(120 * context.getResources().getDisplayMetrics().density), 
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        menuParams.topMargin = 15;
+        menuLayout.setLayoutParams(menuParams);
 
         Button btnStart = new Button(context);
         btnStart.setText("▶ СТАРТ");
@@ -71,7 +81,6 @@ public class FloatingView {
 
         rootLayout.addView(menuLayout);
 
-        // Настройки окна
         int layoutFlag;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             layoutFlag = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
@@ -90,7 +99,6 @@ public class FloatingView {
         params.x = 100;
         params.y = 100;
 
-        // Логика перетаскивания и клика
         buttonView.setOnTouchListener(new View.OnTouchListener() {
             private int initialX, initialY;
             private float initialTouchX, initialTouchY;
@@ -105,7 +113,6 @@ public class FloatingView {
                         initialTouchY = event.getRawY();
                         return true;
                     case MotionEvent.ACTION_UP:
-                        // Если не двигали — открываем/закрываем меню
                         if (Math.abs(event.getRawX() - initialTouchX) < 10 && Math.abs(event.getRawY() - initialTouchY) < 10) {
                             toggleMenu();
                         }
@@ -120,27 +127,35 @@ public class FloatingView {
             }
         });
 
-        // Кнопки Старт и Стоп
         btnStart.setOnClickListener(v -> {
-            // Логика запуска бота (пока просто текст)
+            isBotRunning = true;
             buttonView.setText("ON");
-            buttonView.setBackgroundColor(Color.parseColor("#00FF41"));
+            
+            GradientDrawable circleOn = new GradientDrawable();
+            circleOn.setShape(GradientDrawable.OVAL);
+            circleOn.setColor(Color.parseColor("#00FF41"));
+            circleOn.setStroke(3, Color.WHITE);
+            buttonView.setBackground(circleOn);
+            
             toggleMenu();
         });
 
         btnStop.setOnClickListener(v -> {
-            // Логика остановки бота
+            isBotRunning = false;
             buttonView.setText("Z");
-            GradientDrawable circle2 = new GradientDrawable();
-            circle2.setShape(GradientDrawable.OVAL);
-            circle2.setColor(Color.parseColor("#A855F7"));
-            circle2.setStroke(3, Color.parseColor("#00D4FF"));
-            buttonView.setBackground(circle2);
+            
+            GradientDrawable circleOff = new GradientDrawable();
+            circleOff.setShape(GradientDrawable.OVAL);
+            circleOff.setColor(Color.parseColor("#A855F7"));
+            circleOff.setStroke(3, Color.parseColor("#00D4FF"));
+            buttonView.setBackground(circleOff);
+            
             toggleMenu();
         });
     }
 
     private void toggleMenu() {
+        if (isBotRunning) return;
         if (isMenuOpen) {
             menuLayout.setVisibility(View.GONE);
             isMenuOpen = false;
