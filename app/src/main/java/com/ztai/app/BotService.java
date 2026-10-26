@@ -1,5 +1,8 @@
 package com.ztai.app;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
@@ -11,6 +14,7 @@ import android.media.Image;
 import android.media.ImageReader;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -30,6 +34,8 @@ public class BotService extends Service {
     private ImageReader imageReader;
     private int screenWidth, screenHeight, screenDpi;
 
+    private static final String CHANNEL_ID = "ZTaiChannel";
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -41,6 +47,20 @@ public class BotService extends Service {
         screenWidth = metrics.widthPixels;
         screenHeight = metrics.heightPixels;
         screenDpi = metrics.densityDpi;
+        
+        createNotificationChannel();
+    }
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel serviceChannel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "ZTai Service Channel",
+                    NotificationManager.IMPORTANCE_DEFAULT
+            );
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            manager.createNotificationChannel(serviceChannel);
+        }
     }
 
     @Override
@@ -48,9 +68,12 @@ public class BotService extends Service {
         if (intent != null && intent.getStringExtra("action") != null) {
             String action = intent.getStringExtra("action");
             if (action.equals("start")) {
+                startForegroundServiceWithNotification();
                 startBot();
             } else if (action.equals("stop")) {
                 stopBot();
+                stopForeground(true);
+                stopSelf();
             } else if (action.equals("set_projection")) {
                 int resultCode = intent.getIntExtra("result_code", 0);
                 Intent data = intent.getParcelableExtra("data");
@@ -58,6 +81,15 @@ public class BotService extends Service {
             }
         }
         return START_STICKY;
+    }
+
+    private void startForegroundServiceWithNotification() {
+        Notification notification = new Notification.Builder(this, CHANNEL_ID)
+                .setContentTitle("ZTai работает")
+                .setContentText("Бот активен и готов к игре")
+                .setSmallIcon(android.R.drawable.ic_menu_camera)
+                .build();
+        startForeground(1, notification);
     }
 
     private void setupMediaProjection(int resultCode, Intent data) {
@@ -71,7 +103,7 @@ public class BotService extends Service {
                     screenWidth, screenHeight, screenDpi,
                     DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                     imageReader.getSurface(), null, handler);
-            System.out.println("ZTai: MediaProjection готов, экран захвачен.");
+            System.out.println("ZTai: MediaProjection готов.");
         }
     }
 
@@ -83,14 +115,7 @@ public class BotService extends Service {
             @Override
             public void run() {
                 if (!isRunning) return;
-
-                // 1. Делаем скриншот (чтобы бот "видел")
                 captureScreen();
-
-                // 2. ТЕСТ: Тап по центру экрана (в будущем — координаты кнопок Brawl Stars)
-                TapService.tap(screenWidth / 2f, screenHeight / 2f);
-
-                // Повторяем каждые 2 секунды
                 handler.postDelayed(this, 2000);
             }
         };
@@ -99,7 +124,10 @@ public class BotService extends Service {
     }
 
     private void captureScreen() {
-        if (imageReader == null) return;
+        if (imageReader == null) {
+            System.out.println("ZTai: imageReader null (нет разрешения на экран)");
+            return;
+        }
         Image image = imageReader.acquireLatestImage();
         if (image == null) return;
 
@@ -113,7 +141,6 @@ public class BotService extends Service {
             Bitmap bitmap = Bitmap.createBitmap(screenWidth + rowPadding / pixelStride, screenHeight, Bitmap.Config.ARGB_8888);
             bitmap.copyPixelsFromBuffer(buffer);
             
-            // ЗДЕСЬ В БУДУЩЕМ БУДЕТ АНАЛИЗ КАРТИНКИ (поиск врагов, HP и т.д.)
             System.out.println("ZTai: Скриншот сделан! Размер: " + bitmap.getWidth() + "x" + bitmap.getHeight());
 
         } catch (Exception e) {
