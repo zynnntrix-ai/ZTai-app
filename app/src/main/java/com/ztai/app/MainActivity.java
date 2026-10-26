@@ -18,6 +18,9 @@ import androidx.annotation.Nullable;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -35,17 +38,33 @@ public class MainActivity extends Activity {
     private Button btnActivate;
     private String key;
     private final OkHttpClient client = new OkHttpClient();
+    private LinearLayout layout;
+    private SharedPreferences prefs;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        // Создаем интерфейс программно, чтобы не зависеть от XML
-        LinearLayout layout = new LinearLayout(this);
+        prefs = getSharedPreferences("prefs", MODE_PRIVATE);
+        
+        layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setGravity(Gravity.CENTER);
         layout.setBackgroundColor(Color.parseColor("#0a0e1a"));
         layout.setPadding(50, 50, 50, 50);
+
+        // Проверяем, активирован ли уже ключ
+        String savedKey = prefs.getString("key", null);
+        if (savedKey != null) {
+            showStatusScreen();
+        } else {
+            showLoginScreen();
+        }
+        
+        setContentView(layout);
+    }
+
+    private void showLoginScreen() {
+        layout.removeAllViews();
 
         TextView tvTitle = new TextView(this);
         tvTitle.setText("ZTai");
@@ -72,21 +91,6 @@ public class MainActivity extends Activity {
         btnActivate.setTextColor(Color.WHITE);
         layout.addView(btnActivate);
 
-        setContentView(layout);
-
-        SharedPreferences prefs = getSharedPreferences("prefs", MODE_PRIVATE);
-        String savedKey = prefs.getString("key", null);
-        
-        if (savedKey != null) {
-            key = savedKey;
-            etKey.setText(key);
-            tvStatus.setText("Ключ уже активирован");
-            tvStatus.setTextColor(Color.GREEN);
-            btnActivate.setText("Открыть меню");
-            btnActivate.setOnClickListener(v -> checkAndLaunchUI());
-            return;
-        }
-
         btnActivate.setOnClickListener(v -> {
             key = etKey.getText().toString().trim();
             if (key.isEmpty()) {
@@ -97,6 +101,66 @@ public class MainActivity extends Activity {
         });
     }
 
+    private void showStatusScreen() {
+        layout.removeAllViews();
+        String savedKey = prefs.getString("key", "N/A");
+        long expires = prefs.getLong("expires", 0);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText("✅ Ключ активирован");
+        tvTitle.setTextSize(24);
+        tvTitle.setTextColor(Color.GREEN);
+        tvTitle.setGravity(Gravity.CENTER);
+        tvTitle.setPadding(0, 0, 0, 30);
+        layout.addView(tvTitle);
+
+        TextView tvKeyInfo = new TextView(this);
+        tvKeyInfo.setText("Ваш ключ: " + savedKey);
+        tvKeyInfo.setTextColor(Color.WHITE);
+        tvKeyInfo.setGravity(Gravity.CENTER);
+        layout.addView(tvKeyInfo);
+
+        TextView tvExpires = new TextView(this);
+        if (expires > 0) {
+            SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault());
+            String dateStr = sdf.format(new Date(expires));
+            tvExpires.setText("Действует до: " + dateStr);
+        } else {
+            tvExpires.setText("Срок действия: неограничен");
+        }
+        tvExpires.setTextColor(Color.LTGRAY);
+        tvExpires.setGravity(Gravity.CENTER);
+        tvExpires.setPadding(0, 10, 0, 30);
+        layout.addView(tvExpires);
+
+        Button btnOpenMenu = new Button(this);
+        btnOpenMenu.setText("Открыть меню (Оверлей)");
+        btnOpenMenu.setBackgroundColor(Color.parseColor("#a855f7"));
+        btnOpenMenu.setTextColor(Color.WHITE);
+        layout.addView(btnOpenMenu);
+        btnOpenMenu.setOnClickListener(v -> checkAndLaunchUI());
+
+        Button btnBuy = new Button(this);
+        btnBuy.setText("Купить новый ключ в Telegram");
+        btnBuy.setBackgroundColor(Color.TRANSPARENT);
+        btnBuy.setTextColor(Color.parseColor("#00d4ff"));
+        layout.addView(btnBuy);
+        btnBuy.setOnClickListener(v -> {
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/zynvpn_originalbot"));
+            startActivity(intent);
+        });
+
+        Button btnReset = new Button(this);
+        btnReset.setText("Сбросить ключ");
+        btnReset.setTextColor(Color.RED);
+        btnReset.setBackgroundColor(Color.TRANSPARENT);
+        layout.addView(btnReset);
+        btnReset.setOnClickListener(v -> {
+            prefs.edit().clear().apply();
+            showLoginScreen();
+        });
+    }
+
     private void activateKey() {
         tvStatus.setText("Проверка...");
         tvStatus.setTextColor(Color.YELLOW);
@@ -104,7 +168,7 @@ public class MainActivity extends Activity {
         JSONObject json = new JSONObject();
         try {
             json.put("key", key);
-            json.put("device_id", getDeviceId());
+            json.put("device_id", fetchMyDeviceId());
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -131,24 +195,16 @@ public class MainActivity extends Activity {
                     try {
                         JSONObject json = new JSONObject(respStr);
                         if (json.optBoolean("ok", false)) {
-                            getSharedPreferences("prefs", MODE_PRIVATE)
-                                    .edit()
+                            prefs.edit()
                                     .putString("key", key)
                                     .putLong("expires", json.optLong("expires", 0))
                                     .apply();
-
-                            tvStatus.setTextColor(Color.GREEN);
-                            tvStatus.setText("✅ Ключ активирован!");
                             
-                            btnActivate.setText("Открыть меню");
-                            btnActivate.setOnClickListener(v -> checkAndLaunchUI());
-
                             startService(new Intent(MainActivity.this, BotService.class));
-                            checkAndLaunchUI();
-
+                            showStatusScreen();
                         } else {
                             String error = json.optString("error", "unknown");
-                            String msg = "";
+                            String msg;
                             if (error.equals("invalid_key")) msg = "❌ Неверный ключ";
                             else if (error.equals("expired")) msg = "❌ Ключ истёк";
                             else msg = "❌ Ошибка: " + error;
@@ -157,7 +213,7 @@ public class MainActivity extends Activity {
                         }
                     } catch (Exception e) {
                         tvStatus.setTextColor(Color.RED);
-                        tvStatus.setText("Ошибка парсинга ответа");
+                        tvStatus.setText("Ошибка ответа сервера");
                     }
                 });
             }
@@ -192,9 +248,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    // Переименовали метод, чтобы не конфликтовать с системным
     private String fetchMyDeviceId() {
         return Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
     }
 }
-
