@@ -113,7 +113,7 @@ public class MainActivity extends Activity {
         btnActivate.setEnabled(false);
         btnActivate.setText("ПРОВЕРКА...");
 
-        String deviceId = getDeviceId();
+        String deviceId = fetchMyDeviceId();
 
         JSONObject json = new JSONObject();
         try {
@@ -221,7 +221,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private String getDeviceId() {
+    private String fetchMyDeviceId() {
         String id = Settings.Secure.getString(getContentResolver(),
             Settings.Secure.ANDROID_ID);
         return id != null ? id : "unknown";
