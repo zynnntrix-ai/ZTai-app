@@ -1,6 +1,7 @@
 package com.ztai.app;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -8,6 +9,7 @@ import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
@@ -15,6 +17,7 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 
@@ -197,7 +200,6 @@ public class MainActivity extends Activity {
         tvSub.setPadding(0, 0, 0, 30);
         contentLayout.addView(tvSub);
 
-        // Карточка бойца
         LinearLayout brawlerCard = new LinearLayout(this);
         brawlerCard.setOrientation(LinearLayout.VERTICAL);
         brawlerCard.setGravity(Gravity.CENTER);
@@ -208,9 +210,8 @@ public class MainActivity extends Activity {
         cardParams.setMargins(0, 0, 0, 30);
         brawlerCard.setLayoutParams(cardParams);
 
-        // Аватарка (заглушка)
         TextView avatar = new TextView(this);
-        avatar.setText("S"); // Первая буква Shelly
+        avatar.setText("S");
         avatar.setTextSize(40);
         avatar.setTextColor(Color.WHITE);
         avatar.setGravity(Gravity.CENTER);
@@ -241,7 +242,7 @@ public class MainActivity extends Activity {
         btnStart.setBackgroundResource(R.drawable.bg_btn_primary);
         btnStart.setPadding(0, 20, 0, 20);
         contentLayout.addView(btnStart);
-        btnStart.setOnClickListener(v -> checkAndLaunchUI());
+        btnStart.setOnClickListener(v -> tryStartBot());
 
         TextView tvExpires = new TextView(this);
         long expires = prefs.getLong("expires", 0);
@@ -255,6 +256,37 @@ public class MainActivity extends Activity {
         tvExpires.setGravity(Gravity.CENTER);
         tvExpires.setPadding(0, 30, 0, 0);
         contentLayout.addView(tvExpires);
+    }
+
+    // --- ЛОГИКА ПРОВЕРКИ РАЗРЕШЕНИЙ ПЕРЕД ЗАПУСКОМ ---
+    private void tryStartBot() {
+        boolean hasOverlay = Settings.canDrawOverlays(this);
+        boolean hasAccessibility = isAccessibilityServiceEnabled(this, TapService.class);
+
+        if (!hasOverlay || !hasAccessibility) {
+            Toast.makeText(this, "Разрешите все в настройках для запуска!", Toast.LENGTH_LONG).show();
+            selectTab(3); // Перекидываем на вкладку "НАСТРОЙКИ"
+            return;
+        }
+
+        // Если все разрешения есть — запускаем
+        launchBotUI();
+    }
+
+    // Проверка, включена ли Служба доступности
+    private boolean isAccessibilityServiceEnabled(Context context, Class<?> serviceClass) {
+        String enabledServicesSetting = Settings.Secure.getString(
+                context.getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        if (enabledServicesSetting == null) return false;
+        TextUtils.SimpleStringSplitter colonSplitter = new TextUtils.SimpleStringSplitter(':');
+        colonSplitter.setString(enabledServicesSetting);
+        while (colonSplitter.hasNext()) {
+            String componentNameString = colonSplitter.next();
+            if (componentNameString.equalsIgnoreCase(context.getPackageName() + "/" + serviceClass.getName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void showInfoTab() {
@@ -272,11 +304,10 @@ public class MainActivity extends Activity {
                 "✅ Работает в фоне\n" +
                 "✅ Простой интерфейс\n\n" +
                 "Как играть:\n" +
-                "1. Нажмите ЗАПУСТИТЬ на главной.\n" +
-                "2. Разрешите показ поверх других окон.\n" +
+                "1. Включите все разрешения в 'Настройках'.\n" +
+                "2. Нажмите ЗАПУСТИТЬ на главной.\n" +
                 "3. Откройте Brawl Stars.\n" +
-                "4. Бот начнет играть автоматически.\n\n" +
-                "Важно: Бот не читает память игры. Он использует экранный анализ (OCR) и тапы.";
+                "4. Бот начнет играть автоматически.";
         
         TextView tvInfo = new TextView(this);
         tvInfo.setText(infoText);
@@ -295,7 +326,6 @@ public class MainActivity extends Activity {
         title.setPadding(0, 0, 0, 20);
         contentLayout.addView(title);
 
-        // Заглушки для статистики сессии
         addStatCard("Время сессии", "00:00:00");
         addStatCard("Матчей сыграно", "0");
         addStatCard("Побед", "0");
@@ -345,9 +375,31 @@ public class MainActivity extends Activity {
         permTitle.setPadding(0, 0, 0, 10);
         contentLayout.addView(permTitle);
 
-        addSettingsItem("Служба доступности", "Для тапов по экрану", true);
-        addSettingsItem("Показ поверх окон", "Для плавающего меню", true);
-        addSettingsItem("Отключить оптимизацию батареи", "Чтобы бот не выгружался", false);
+        // Проверяем статусы разрешений
+        boolean hasOverlay = Settings.canDrawOverlays(this);
+        boolean hasAccessibility = isAccessibilityServiceEnabled(this, TapService.class);
+
+        // Кнопка для перехода в настройки оверлея
+        addClickableSettingItem("Показ поверх окон", hasOverlay ? "Включено ✅" : "Выключено ❌ (Нажмите)", 
+                hasOverlay ? Color.GREEN : Color.RED, 
+                () -> {
+                    Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()));
+                    startActivity(intent);
+                });
+
+        // Кнопка для перехода в настройки доступности
+        addClickableSettingItem("Служба доступности", hasAccessibility ? "Включено ✅" : "Выключено ❌ (Нажмите)", 
+                hasAccessibility ? Color.GREEN : Color.RED, 
+                () -> {
+                    Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+                    startActivity(intent);
+                });
+
+        addClickableSettingItem("Оптимизация батареи", "Отключить для стабильности", Color.LTGRAY, 
+                () -> {
+                    Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+                    startActivity(intent);
+                });
 
         TextView styleTitle = new TextView(this);
         styleTitle.setText("\nПлейстайл:");
@@ -369,6 +421,40 @@ public class MainActivity extends Activity {
             prefs.edit().clear().apply();
             showLoginScreen();
         });
+    }
+
+    // Новый метод для кликабельных настроек
+    private void addClickableSettingItem(String title, String subtitle, int subtitleColor, Runnable onClick) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(30, 20, 30, 20);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setBackgroundResource(R.drawable.bg_card_glass);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, 0, 0, 15);
+        row.setLayoutParams(params);
+
+        LinearLayout textLayout = new LinearLayout(this);
+        textLayout.setOrientation(LinearLayout.VERTICAL);
+        textLayout.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(title);
+        tvTitle.setTextColor(Color.WHITE);
+        tvTitle.setTextSize(16);
+        textLayout.addView(tvTitle);
+
+        TextView tvSub = new TextView(this);
+        tvSub.setText(subtitle);
+        tvSub.setTextColor(subtitleColor);
+        tvSub.setTextSize(12);
+        textLayout.addView(tvSub);
+
+        row.addView(textLayout);
+        row.setOnClickListener(v -> onClick.run());
+
+        contentLayout.addView(row);
     }
 
     private void addSettingsItem(String title, String subtitle, boolean isChecked) {
@@ -402,16 +488,6 @@ public class MainActivity extends Activity {
         contentLayout.addView(row);
     }
 
-    private void checkAndLaunchUI() {
-        if (Settings.canDrawOverlays(this)) {
-            launchBotUI();
-        } else {
-            Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:" + getPackageName()));
-            startActivityForResult(intent, 101);
-        }
-    }
-
     private void launchBotUI() {
         startService(new Intent(this, BotService.class));
         startService(new Intent(this, FloatingService.class));
@@ -419,12 +495,11 @@ public class MainActivity extends Activity {
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == 101) {
-            if (Settings.canDrawOverlays(this)) {
-                launchBotUI();
-            }
+    protected void onResume() {
+        super.onResume();
+        // Обновляем вкладку настроек, если вернулись из системных настроек
+        if (tabBar.getVisibility() == View.VISIBLE && tabViews[3].getCurrentTextColor() == Color.parseColor("#00D4FF")) {
+            showSettingsTab();
         }
     }
 }
