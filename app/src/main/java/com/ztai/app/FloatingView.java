@@ -1,6 +1,7 @@
 package com.ztai.app;
 
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
@@ -137,6 +138,11 @@ public class FloatingView {
             circleOn.setStroke(3, Color.WHITE);
             buttonView.setBackground(circleOn);
             
+            // Отправляем команду в BotService
+            Intent intent = new Intent(context, BotService.class);
+            intent.putExtra("action", "start");
+            context.startService(intent);
+
             toggleMenu();
         });
 
@@ -150,6 +156,11 @@ public class FloatingView {
             circleOff.setStroke(3, Color.parseColor("#00D4FF"));
             buttonView.setBackground(circleOff);
             
+            // Отправляем команду в BotService
+            Intent intent = new Intent(context, BotService.class);
+            intent.putExtra("action", "stop");
+            context.startService(intent);
+
             toggleMenu();
         });
     }

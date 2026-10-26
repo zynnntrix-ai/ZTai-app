@@ -1,53 +1,79 @@
 package com.ztai.app;
 
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
-import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 
 public class BotService extends Service {
 
-    private static final String CH = "ztai_ch";
+    private Handler handler;
+    private boolean isRunning = false;
+    private Runnable botLoop;
 
     @Override
     public void onCreate() {
         super.onCreate();
-        if (Build.VERSION.SDK_INT >= 26) {
-            NotificationChannel ch = new NotificationChannel(
-                CH, "ZTai", NotificationManager.IMPORTANCE_MIN);
-            ch.setShowBadge(false);
-            NotificationManager nm = getSystemService(NotificationManager.class);
-            if (nm != null) nm.createNotificationChannel(ch);
-        }
+        handler = new Handler(Looper.getMainLooper());
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Notification.Builder b;
-        if (Build.VERSION.SDK_INT >= 26) b = new Notification.Builder(this, CH);
-        else b = new Notification.Builder(this);
-
-        b.setContentTitle("ZTai")
-         .setContentText("Активен")
-         .setSmallIcon(android.R.drawable.stat_notify_sync);
-
-        if (Build.VERSION.SDK_INT >= 29) {
-            try {
-                startForeground(1, b.build(),
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-                    | android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
-            } catch (Throwable t) {
-                startForeground(1, b.build());
+        if (intent != null && intent.getStringExtra("action") != null) {
+            String action = intent.getStringExtra("action");
+            if (action.equals("start")) {
+                startBot();
+            } else if (action.equals("stop")) {
+                stopBot();
             }
-        } else {
-            startForeground(1, b.build());
         }
-
         return START_STICKY;
     }
 
-    @Override public IBinder onBind(Intent intent) { return null; }
+    private void startBot() {
+        if (isRunning) return;
+        isRunning = true;
+
+        botLoop = new Runnable() {
+            @Override
+            public void run() {
+                if (!isRunning) return;
+
+                // ТЕСТОВАЯ ЛОГИКА: Просто свайп вправо и тап по центру
+                // В будущем здесь будет OCR и анализ экрана
+                
+                // 1. Свайп (движение)
+                TapService.swipe(500, 1500, 800, 1500, 200); 
+                
+                // 2. Тап (атака) через 1 секунду
+                handler.postDelayed(() -> {
+                    TapService.tap(1000, 1500); // Пример: тап по кнопке атаки
+                }, 1000);
+
+                // Повторяем цикл каждые 2 секунды
+                handler.postDelayed(this, 2000);
+            }
+        };
+        
+        handler.post(botLoop);
+    }
+
+    private void stopBot() {
+        isRunning = false;
+        if (handler != null && botLoop != null) {
+            handler.removeCallbacks(botLoop);
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        stopBot();
+        super.onDestroy();
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
 }
