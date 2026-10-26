@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -12,6 +13,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.Switch;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
@@ -34,49 +36,71 @@ import okhttp3.Response;
 public class MainActivity extends Activity {
 
     private static final String SERVER_URL = "https://ztai-production.up.railway.app";
-    private EditText etKey;
-    private TextView tvStatus;
-    private Button btnActivate;
-    private String key;
     private final OkHttpClient client = new OkHttpClient();
-    private LinearLayout mainLayout;
-    private LinearLayout contentLayout;
     private SharedPreferences prefs;
+    private LinearLayout contentLayout;
     private LinearLayout tabBar;
+    private TextView[] tabViews = new TextView[4];
+    private String[] tabNames = {"ГЛАВНАЯ", "ИНФО", "СТАТИСТИКА", "НАСТРОЙКИ"};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences("prefs", MODE_PRIVATE);
 
-        mainLayout = new LinearLayout(this);
+        LinearLayout mainLayout = new LinearLayout(this);
         mainLayout.setOrientation(LinearLayout.VERTICAL);
-        mainLayout.setBackgroundColor(Color.parseColor("#0a0e1a"));
+        mainLayout.setBackgroundColor(Color.parseColor("#0A0E1A"));
 
-        // Контейнер для контента (меняется при переключении вкладок)
         contentLayout = new LinearLayout(this);
         contentLayout.setOrientation(LinearLayout.VERTICAL);
-        contentLayout.setGravity(Gravity.CENTER);
+        contentLayout.setGravity(Gravity.CENTER_HORIZONTAL);
+        contentLayout.setPadding(30, 30, 30, 30);
         contentLayout.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
         mainLayout.addView(contentLayout);
 
-        // Нижняя панель вкладок
         tabBar = new LinearLayout(this);
         tabBar.setOrientation(LinearLayout.HORIZONTAL);
-        tabBar.setBackgroundColor(Color.parseColor("#1a1a2e"));
-        tabBar.setPadding(0, 10, 0, 10);
-        tabBar.setVisibility(View.GONE); // Покажем только после активации
+        tabBar.setBackgroundColor(Color.parseColor("#120A1A"));
+        tabBar.setPadding(0, 15, 0, 15);
+        tabBar.setVisibility(View.GONE);
+
+        for (int i = 0; i < tabNames.length; i++) {
+            final int index = i;
+            TextView tvTab = new TextView(this);
+            tvTab.setText(tabNames[i]);
+            tvTab.setTextSize(11);
+            tvTab.setGravity(Gravity.CENTER);
+            tvTab.setPadding(0, 10, 0, 10);
+            tvTab.setTextColor(Color.parseColor("#888888"));
+            tvTab.setTypeface(null, Typeface.BOLD);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+            tvTab.setLayoutParams(params);
+            tabBar.addView(tvTab);
+            tabViews[i] = tvTab;
+            tvTab.setOnClickListener(v -> selectTab(index));
+        }
         mainLayout.addView(tabBar);
 
         setContentView(mainLayout);
 
-        String savedKey = prefs.getString("key", null);
-        if (savedKey != null) {
+        if (prefs.getString("key", null) != null) {
             showMainTabs();
         } else {
             showLoginScreen();
         }
+    }
+
+    private void selectTab(int index) {
+        for (int i = 0; i < tabViews.length; i++) {
+            tabViews[i].setTextColor(i == index ? Color.parseColor("#00D4FF") : Color.parseColor("#888888"));
+        }
+        if (index == 0) showHomeTab();
+        else if (index == 1) showInfoTab();
+        else if (index == 2) showStatsTab();
+        else showSettingsTab();
     }
 
     private void showLoginScreen() {
@@ -84,209 +108,298 @@ public class MainActivity extends Activity {
         tabBar.setVisibility(View.GONE);
 
         TextView tvTitle = new TextView(this);
-        tvTitle.setText("ZTai");
-        tvTitle.setTextSize(32);
-        tvTitle.setTextColor(Color.parseColor("#a855f7"));
+        tvTitle.setText("ZTAI");
+        tvTitle.setTextSize(48);
+        tvTitle.setTextColor(Color.parseColor("#A855F7"));
         tvTitle.setGravity(Gravity.CENTER);
+        tvTitle.setPadding(0, 100, 0, 50);
+        tvTitle.setTypeface(null, Typeface.BOLD);
         contentLayout.addView(tvTitle);
 
-        etKey = new EditText(this);
+        EditText etKey = new EditText(this);
         etKey.setHint("Введите ключ активации");
         etKey.setTextColor(Color.WHITE);
         etKey.setHintTextColor(Color.GRAY);
+        etKey.setBackgroundColor(Color.parseColor("#1A1A2E"));
+        etKey.setPadding(30, 30, 30, 30);
         contentLayout.addView(etKey);
 
-        tvStatus = new TextView(this);
+        TextView tvStatus = new TextView(this);
         tvStatus.setText("Ожидание...");
         tvStatus.setTextColor(Color.WHITE);
         tvStatus.setPadding(0, 20, 0, 20);
         contentLayout.addView(tvStatus);
 
-        btnActivate = new Button(this);
-        btnActivate.setText("Активировать");
-        btnActivate.setBackgroundColor(Color.parseColor("#a855f7"));
+        Button btnActivate = new Button(this);
+        btnActivate.setText("АКТИВИРОВАТЬ");
         btnActivate.setTextColor(Color.WHITE);
+        btnActivate.setBackgroundResource(R.drawable.bg_btn_primary);
         contentLayout.addView(btnActivate);
 
         btnActivate.setOnClickListener(v -> {
-            key = etKey.getText().toString().trim();
-            if (key.isEmpty()) {
-                tvStatus.setText("Введите ключ");
-                return;
-            }
-            activateKey();
-        });
-    }
+            String key = etKey.getText().toString().trim();
+            if (key.isEmpty()) { tvStatus.setText("Введите ключ"); return; }
+            tvStatus.setText("Проверка...");
+            tvStatus.setTextColor(Color.YELLOW);
+            
+            JSONObject json = new JSONObject();
+            try {
+                json.put("key", key);
+                json.put("device_id", Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID));
+            } catch (Exception e) { e.printStackTrace(); }
 
-    private void activateKey() {
-        tvStatus.setText("Проверка...");
-        tvStatus.setTextColor(Color.YELLOW);
+            RequestBody body = RequestBody.create(json.toString(), MediaType.parse("application/json"));
+            Request request = new Request.Builder().url(SERVER_URL + "/api/check_key").post(body).build();
 
-        JSONObject json = new JSONObject();
-        try {
-            json.put("key", key);
-            json.put("device_id", fetchMyDeviceId());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        RequestBody body = RequestBody.create(json.toString(), MediaType.parse("application/json; charset=utf-8"));
-        Request request = new Request.Builder()
-                .url(SERVER_URL + "/api/check_key")
-                .post(body)
-                .build();
-
-        client.newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
-                runOnUiThread(() -> {
-                    tvStatus.setTextColor(Color.RED);
-                    tvStatus.setText("Ошибка сети: " + e.getMessage());
-                });
-            }
-
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                String respStr = response.body().string();
-                runOnUiThread(() -> {
-                    try {
-                        JSONObject json = new JSONObject(respStr);
-                        if (json.optBoolean("ok", false)) {
-                            prefs.edit()
-                                    .putString("key", key)
-                                    .putLong("expires", json.optLong("expires", 0))
-                                    .apply();
-                            showMainTabs();
-                        } else {
-                            String error = json.optString("error", "unknown");
-                            String msg;
-                            if (error.equals("invalid_key")) msg = "❌ Неверный ключ";
-                            else if (error.equals("expired")) msg = "❌ Ключ истёк";
-                            else msg = "❌ Ошибка: " + error;
-                            tvStatus.setTextColor(Color.RED);
-                            tvStatus.setText(msg);
-                        }
-                    } catch (Exception e) {
-                        tvStatus.setTextColor(Color.RED);
-                        tvStatus.setText("Ошибка ответа сервера");
-                    }
-                });
-            }
+            client.newCall(request).enqueue(new Callback() {
+                @Override public void onFailure(Call call, IOException e) {
+                    runOnUiThread(() -> { tvStatus.setTextColor(Color.RED); tvStatus.setText("Ошибка сети"); });
+                }
+                @Override public void onResponse(Call call, Response response) throws IOException {
+                    String resp = response.body().string();
+                    runOnUiThread(() -> {
+                        try {
+                            JSONObject j = new JSONObject(resp);
+                            if (j.optBoolean("ok", false)) {
+                                prefs.edit().putString("key", key).putLong("expires", j.optLong("expires", 0)).apply();
+                                showMainTabs();
+                            } else {
+                                tvStatus.setTextColor(Color.RED);
+                                tvStatus.setText("❌ " + j.optString("error", "unknown"));
+                            }
+                        } catch (Exception e) { tvStatus.setText("Ошибка ответа"); }
+                    });
+                }
+            });
         });
     }
 
     private void showMainTabs() {
         tabBar.setVisibility(View.VISIBLE);
-        tabBar.removeAllViews();
-
-        String[] tabs = {"ГЛАВНАЯ", "БОТ", "СТАТИСТИКА", "НАСТРОЙКИ"};
-        for (String tabName : tabs) {
-            TextView tvTab = new TextView(this);
-            tvTab.setText(tabName);
-            tvTab.setTextColor(Color.WHITE);
-            tvTab.setPadding(20, 10, 20, 10);
-            tvTab.setTextSize(12);
-            tvTab.setGravity(Gravity.CENTER);
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-            tvTab.setLayoutParams(params);
-            tabBar.addView(tvTab);
-
-            tvTab.setOnClickListener(v -> {
-                if (tabName.equals("ГЛАВНАЯ")) showHomeTab();
-                else if (tabName.equals("БОТ")) showBotTab();
-                else if (tabName.equals("СТАТИСТИКА")) showStatsTab();
-                else if (tabName.equals("НАСТРОЙКИ")) showSettingsTab();
-            });
-        }
-
-        showHomeTab(); // По умолчанию открываем главную
+        selectTab(0);
     }
 
     private void showHomeTab() {
         contentLayout.removeAllViews();
 
-        TextView tvTitle = new TextView(this);
-        tvTitle.setText("Mecha Premium");
-        tvTitle.setTextSize(24);
-        tvTitle.setTextColor(Color.WHITE);
-        tvTitle.setGravity(Gravity.CENTER);
-        tvTitle.setPadding(0, 20, 0, 20);
-        contentLayout.addView(tvTitle);
+        TextView tvLogo = new TextView(this);
+        tvLogo.setText("ZTai");
+        tvLogo.setTextSize(32);
+        tvLogo.setTextColor(Color.parseColor("#A855F7"));
+        tvLogo.setGravity(Gravity.CENTER);
+        tvLogo.setTypeface(null, Typeface.BOLD);
+        contentLayout.addView(tvLogo);
 
-        TextView tvBrawler = new TextView(this);
-        tvBrawler.setText("БОЕЦ\nShelly\nНАЧАЛЬНЫЙ");
-        tvBrawler.setTextSize(18);
-        tvBrawler.setTextColor(Color.CYAN);
-        tvBrawler.setGravity(Gravity.CENTER);
-        tvBrawler.setPadding(0, 20, 0, 20);
-        contentLayout.addView(tvBrawler);
+        TextView tvSub = new TextView(this);
+        tvSub.setText("AI-бот для Brawl Stars");
+        tvSub.setTextColor(Color.parseColor("#00D4FF"));
+        tvSub.setGravity(Gravity.CENTER);
+        tvSub.setPadding(0, 0, 0, 30);
+        contentLayout.addView(tvSub);
+
+        // Карточка бойца
+        LinearLayout brawlerCard = new LinearLayout(this);
+        brawlerCard.setOrientation(LinearLayout.VERTICAL);
+        brawlerCard.setGravity(Gravity.CENTER);
+        brawlerCard.setBackgroundResource(R.drawable.bg_card_glass);
+        brawlerCard.setPadding(40, 40, 40, 40);
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        cardParams.setMargins(0, 0, 0, 30);
+        brawlerCard.setLayoutParams(cardParams);
+
+        // Аватарка (заглушка)
+        TextView avatar = new TextView(this);
+        avatar.setText("S"); // Первая буква Shelly
+        avatar.setTextSize(40);
+        avatar.setTextColor(Color.WHITE);
+        avatar.setGravity(Gravity.CENTER);
+        avatar.setBackgroundResource(R.drawable.bg_avatar_circle);
+        int size = (int) getResources().getDisplayMetrics().density * 80;
+        LinearLayout.LayoutParams avatarParams = new LinearLayout.LayoutParams(size, size);
+        avatar.setLayoutParams(avatarParams);
+        brawlerCard.addView(avatar);
+
+        TextView brawlerName = new TextView(this);
+        brawlerName.setText("Shelly");
+        brawlerName.setTextSize(20);
+        brawlerName.setTextColor(Color.WHITE);
+        brawlerName.setTypeface(null, Typeface.BOLD);
+        brawlerName.setPadding(0, 15, 0, 0);
+        brawlerCard.addView(brawlerName);
+
+        TextView brawlerRarity = new TextView(this);
+        brawlerRarity.setText("НАЧАЛЬНЫЙ");
+        brawlerRarity.setTextColor(Color.CYAN);
+        brawlerCard.addView(brawlerRarity);
+
+        contentLayout.addView(brawlerCard);
 
         Button btnStart = new Button(this);
         btnStart.setText("▶ ЗАПУСТИТЬ");
-        btnStart.setBackgroundColor(Color.parseColor("#8B0000"));
         btnStart.setTextColor(Color.WHITE);
+        btnStart.setBackgroundResource(R.drawable.bg_btn_primary);
+        btnStart.setPadding(0, 20, 0, 20);
         contentLayout.addView(btnStart);
         btnStart.setOnClickListener(v -> checkAndLaunchUI());
 
         TextView tvExpires = new TextView(this);
         long expires = prefs.getLong("expires", 0);
         if (expires > 0) {
-            SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy", Locale.getDefault());
-            tvExpires.setText("ключ активен еще: " + sdf.format(new Date(expires)));
+            SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault());
+            tvExpires.setText("Ключ активен до: " + sdf.format(new Date(expires)));
         } else {
-            tvExpires.setText("ключ активен: бессрочно");
+            tvExpires.setText("Ключ активен: бессрочно");
         }
         tvExpires.setTextColor(Color.LTGRAY);
-        tvExpires.setPadding(0, 20, 0, 20);
+        tvExpires.setGravity(Gravity.CENTER);
+        tvExpires.setPadding(0, 30, 0, 0);
         contentLayout.addView(tvExpires);
     }
 
-    private void showBotTab() {
+    private void showInfoTab() {
         contentLayout.removeAllViews();
-        TextView tv = new TextView(this);
-        tv.setText("Экран бота\n(Логи/статус)");
-        tv.setTextColor(Color.WHITE);
-        tv.setGravity(Gravity.CENTER);
-        contentLayout.addView(tv);
+        TextView title = new TextView(this);
+        title.setText("ИНФОРМАЦИЯ");
+        title.setTextSize(24);
+        title.setTextColor(Color.WHITE);
+        title.setPadding(0, 0, 0, 20);
+        contentLayout.addView(title);
+
+        String infoText = "ZTai — это умный бот для Brawl Stars.\n\n" +
+                "✅ Поддерживает любого бойца\n" +
+                "✅ Умная логика боя\n" +
+                "✅ Работает в фоне\n" +
+                "✅ Простой интерфейс\n\n" +
+                "Как играть:\n" +
+                "1. Нажмите ЗАПУСТИТЬ на главной.\n" +
+                "2. Разрешите показ поверх других окон.\n" +
+                "3. Откройте Brawl Stars.\n" +
+                "4. Бот начнет играть автоматически.\n\n" +
+                "Важно: Бот не читает память игры. Он использует экранный анализ (OCR) и тапы.";
+        
+        TextView tvInfo = new TextView(this);
+        tvInfo.setText(infoText);
+        tvInfo.setTextColor(Color.LTGRAY);
+        tvInfo.setTextSize(14);
+        tvInfo.setLineSpacing(1.2f, 1.2f);
+        contentLayout.addView(tvInfo);
     }
 
     private void showStatsTab() {
         contentLayout.removeAllViews();
-        TextView tv = new TextView(this);
-        tv.setText("Статистика\nМатчи: 1152\nПобеды: 545");
-        tv.setTextColor(Color.WHITE);
-        tv.setGravity(Gravity.CENTER);
-        contentLayout.addView(tv);
+        TextView title = new TextView(this);
+        title.setText("СТАТИСТИКА");
+        title.setTextSize(24);
+        title.setTextColor(Color.WHITE);
+        title.setPadding(0, 0, 0, 20);
+        contentLayout.addView(title);
+
+        // Заглушки для статистики сессии
+        addStatCard("Время сессии", "00:00:00");
+        addStatCard("Матчей сыграно", "0");
+        addStatCard("Побед", "0");
+        addStatCard("Винрейт", "0%");
+    }
+
+    private void addStatCard(String label, String value) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setBackgroundResource(R.drawable.bg_card_glass);
+        card.setPadding(30, 20, 30, 20);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, 0, 0, 15);
+        card.setLayoutParams(params);
+
+        TextView tvLabel = new TextView(this);
+        tvLabel.setText(label);
+        tvLabel.setTextColor(Color.LTGRAY);
+        tvLabel.setTextSize(16);
+        tvLabel.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        card.addView(tvLabel);
+
+        TextView tvValue = new TextView(this);
+        tvValue.setText(value);
+        tvValue.setTextColor(Color.parseColor("#00D4FF"));
+        tvValue.setTextSize(18);
+        tvValue.setTypeface(null, Typeface.BOLD);
+        card.addView(tvValue);
+
+        contentLayout.addView(card);
     }
 
     private void showSettingsTab() {
         contentLayout.removeAllViews();
-        TextView tv = new TextView(this);
-        tv.setText("Настройки\n(Визуальный режим, ADB и т.д.)");
-        tv.setTextColor(Color.WHITE);
-        tv.setGravity(Gravity.CENTER);
-        contentLayout.addView(tv);
+        TextView title = new TextView(this);
+        title.setText("НАСТРОЙКИ");
+        title.setTextSize(24);
+        title.setTextColor(Color.WHITE);
+        title.setPadding(0, 0, 0, 20);
+        contentLayout.addView(title);
 
-        Button btnBuy = new Button(this);
-        btnBuy.setText("Купить новый ключ");
-        btnBuy.setBackgroundColor(Color.TRANSPARENT);
-        btnBuy.setTextColor(Color.parseColor("#00d4ff"));
-        contentLayout.addView(btnBuy);
-        btnBuy.setOnClickListener(v -> {
-            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/zynvpn_originalbot"));
-            startActivity(intent);
-        });
+        TextView permTitle = new TextView(this);
+        permTitle.setText("Что нужно включить на телефоне:");
+        permTitle.setTextColor(Color.WHITE);
+        permTitle.setTextSize(16);
+        permTitle.setPadding(0, 0, 0, 10);
+        contentLayout.addView(permTitle);
+
+        addSettingsItem("Служба доступности", "Для тапов по экрану", true);
+        addSettingsItem("Показ поверх окон", "Для плавающего меню", true);
+        addSettingsItem("Отключить оптимизацию батареи", "Чтобы бот не выгружался", false);
+
+        TextView styleTitle = new TextView(this);
+        styleTitle.setText("\nПлейстайл:");
+        styleTitle.setTextColor(Color.WHITE);
+        styleTitle.setTextSize(16);
+        styleTitle.setPadding(0, 20, 0, 10);
+        contentLayout.addView(styleTitle);
+
+        addSettingsItem("Rush (Агрессивный)", "Идти в центр", false);
+        addSettingsItem("Showdown Survivor", "Выживать до конца", true);
 
         Button btnReset = new Button(this);
         btnReset.setText("Сбросить ключ");
         btnReset.setTextColor(Color.RED);
         btnReset.setBackgroundColor(Color.TRANSPARENT);
+        btnReset.setPadding(0, 30, 0, 0);
         contentLayout.addView(btnReset);
         btnReset.setOnClickListener(v -> {
             prefs.edit().clear().apply();
             showLoginScreen();
         });
+    }
+
+    private void addSettingsItem(String title, String subtitle, boolean isChecked) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(0, 15, 0, 15);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+
+        LinearLayout textLayout = new LinearLayout(this);
+        textLayout.setOrientation(LinearLayout.VERTICAL);
+        textLayout.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(title);
+        tvTitle.setTextColor(Color.WHITE);
+        tvTitle.setTextSize(16);
+        textLayout.addView(tvTitle);
+
+        TextView tvSub = new TextView(this);
+        tvSub.setText(subtitle);
+        tvSub.setTextColor(Color.GRAY);
+        tvSub.setTextSize(12);
+        textLayout.addView(tvSub);
+
+        row.addView(textLayout);
+
+        Switch sw = new Switch(this);
+        sw.setChecked(isChecked);
+        row.addView(sw);
+
+        contentLayout.addView(row);
     }
 
     private void checkAndLaunchUI() {
@@ -313,9 +426,5 @@ public class MainActivity extends Activity {
                 launchBotUI();
             }
         }
-    }
-
-    private String fetchMyDeviceId() {
-        return Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
     }
 }
