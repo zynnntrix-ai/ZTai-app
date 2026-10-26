@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.media.projection.MediaProjectionManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -45,6 +46,9 @@ public class MainActivity extends Activity {
     private LinearLayout tabBar;
     private TextView[] tabViews = new TextView[4];
     private String[] tabNames = {"ГЛАВНАЯ", "ИНФО", "СТАТИСТИКА", "НАСТРОЙКИ"};
+    
+    private MediaProjectionManager projectionManager;
+    private static final int REQUEST_MEDIA_PROJECTION = 102;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -258,22 +262,19 @@ public class MainActivity extends Activity {
         contentLayout.addView(tvExpires);
     }
 
-    // --- ЛОГИКА ПРОВЕРКИ РАЗРЕШЕНИЙ ПЕРЕД ЗАПУСКОМ ---
     private void tryStartBot() {
         boolean hasOverlay = Settings.canDrawOverlays(this);
         boolean hasAccessibility = isAccessibilityServiceEnabled(this, TapService.class);
 
         if (!hasOverlay || !hasAccessibility) {
             Toast.makeText(this, "Разрешите все в настройках для запуска!", Toast.LENGTH_LONG).show();
-            selectTab(3); // Перекидываем на вкладку "НАСТРОЙКИ"
+            selectTab(3); 
             return;
         }
 
-        // Если все разрешения есть — запускаем
         launchBotUI();
     }
 
-    // Проверка, включена ли Служба доступности
     private boolean isAccessibilityServiceEnabled(Context context, Class<?> serviceClass) {
         String enabledServicesSetting = Settings.Secure.getString(
                 context.getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
@@ -375,11 +376,9 @@ public class MainActivity extends Activity {
         permTitle.setPadding(0, 0, 0, 10);
         contentLayout.addView(permTitle);
 
-        // Проверяем статусы разрешений
         boolean hasOverlay = Settings.canDrawOverlays(this);
         boolean hasAccessibility = isAccessibilityServiceEnabled(this, TapService.class);
 
-        // Кнопка для перехода в настройки оверлея
         addClickableSettingItem("Показ поверх окон", hasOverlay ? "Включено ✅" : "Выключено ❌ (Нажмите)", 
                 hasOverlay ? Color.GREEN : Color.RED, 
                 () -> {
@@ -387,7 +386,6 @@ public class MainActivity extends Activity {
                     startActivity(intent);
                 });
 
-        // Кнопка для перехода в настройки доступности
         addClickableSettingItem("Служба доступности", hasAccessibility ? "Включено ✅" : "Выключено ❌ (Нажмите)", 
                 hasAccessibility ? Color.GREEN : Color.RED, 
                 () -> {
@@ -423,7 +421,6 @@ public class MainActivity extends Activity {
         });
     }
 
-    // Новый метод для кликабельных настроек
     private void addClickableSettingItem(String title, String subtitle, int subtitleColor, Runnable onClick) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -491,15 +488,27 @@ public class MainActivity extends Activity {
     private void launchBotUI() {
         startService(new Intent(this, BotService.class));
         startService(new Intent(this, FloatingService.class));
-        finish();
+
+        projectionManager = (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
+        Intent intent = projectionManager.createScreenCaptureIntent();
+        startActivityForResult(intent, REQUEST_MEDIA_PROJECTION);
     }
 
     @Override
-    protected void onResume() {
-        super.onResume();
-        // Обновляем вкладку настроек, если вернулись из системных настроек
-        if (tabBar.getVisibility() == View.VISIBLE && tabViews[3].getCurrentTextColor() == Color.parseColor("#00D4FF")) {
-            showSettingsTab();
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 101) {
+            if (Settings.canDrawOverlays(this)) {
+                launchBotUI();
+            }
+        } else if (requestCode == REQUEST_MEDIA_PROJECTION) {
+            if (resultCode == Activity.RESULT_OK && data != null) {
+                Intent serviceIntent = new Intent(this, BotService.class);
+                serviceIntent.putExtra("action", "set_projection");
+                serviceIntent.putExtra("result_code", resultCode);
+                serviceIntent.putExtra("data", data);
+                startService(serviceIntent);
+            }
         }
     }
 }
