@@ -3,14 +3,14 @@ package com.ztai.app;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.provider.Settings;
-import android.view.View;
+import android.view.Gravity;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
@@ -39,11 +39,40 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
 
-        etKey = findViewById(R.id.etKey);
-        tvStatus = findViewById(R.id.tvStatus);
-        btnActivate = findViewById(R.id.btnActivate);
+        // Создаем интерфейс программно, чтобы не зависеть от XML
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setGravity(Gravity.CENTER);
+        layout.setBackgroundColor(Color.parseColor("#0a0e1a"));
+        layout.setPadding(50, 50, 50, 50);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText("ZTai");
+        tvTitle.setTextSize(32);
+        tvTitle.setTextColor(Color.parseColor("#a855f7"));
+        tvTitle.setGravity(Gravity.CENTER);
+        layout.addView(tvTitle);
+
+        etKey = new EditText(this);
+        etKey.setHint("Введите ключ активации");
+        etKey.setTextColor(Color.WHITE);
+        etKey.setHintTextColor(Color.GRAY);
+        layout.addView(etKey);
+
+        tvStatus = new TextView(this);
+        tvStatus.setText("Ожидание...");
+        tvStatus.setTextColor(Color.WHITE);
+        tvStatus.setPadding(0, 20, 0, 20);
+        layout.addView(tvStatus);
+
+        btnActivate = new Button(this);
+        btnActivate.setText("Активировать");
+        btnActivate.setBackgroundColor(Color.parseColor("#a855f7"));
+        btnActivate.setTextColor(Color.WHITE);
+        layout.addView(btnActivate);
+
+        setContentView(layout);
 
         SharedPreferences prefs = getSharedPreferences("prefs", MODE_PRIVATE);
         String savedKey = prefs.getString("key", null);
@@ -52,7 +81,7 @@ public class MainActivity extends Activity {
             key = savedKey;
             etKey.setText(key);
             tvStatus.setText("Ключ уже активирован");
-            tvStatus.setTextColor(0xFF00ff41);
+            tvStatus.setTextColor(Color.GREEN);
             btnActivate.setText("Открыть меню");
             btnActivate.setOnClickListener(v -> checkAndLaunchUI());
             return;
@@ -70,7 +99,7 @@ public class MainActivity extends Activity {
 
     private void activateKey() {
         tvStatus.setText("Проверка...");
-        tvStatus.setTextColor(0xFFFFFF00);
+        tvStatus.setTextColor(Color.YELLOW);
 
         JSONObject json = new JSONObject();
         try {
@@ -90,7 +119,7 @@ public class MainActivity extends Activity {
             @Override
             public void onFailure(Call call, IOException e) {
                 runOnUiThread(() -> {
-                    tvStatus.setTextColor(0xFFFF0000);
+                    tvStatus.setTextColor(Color.RED);
                     tvStatus.setText("Ошибка сети: " + e.getMessage());
                 });
             }
@@ -108,7 +137,7 @@ public class MainActivity extends Activity {
                                     .putLong("expires", json.optLong("expires", 0))
                                     .apply();
 
-                            tvStatus.setTextColor(0xFF00ff41);
+                            tvStatus.setTextColor(Color.GREEN);
                             tvStatus.setText("✅ Ключ активирован!");
                             
                             btnActivate.setText("Открыть меню");
@@ -123,11 +152,11 @@ public class MainActivity extends Activity {
                             if (error.equals("invalid_key")) msg = "❌ Неверный ключ";
                             else if (error.equals("expired")) msg = "❌ Ключ истёк";
                             else msg = "❌ Ошибка: " + error;
-                            tvStatus.setTextColor(0xFFFF0000);
+                            tvStatus.setTextColor(Color.RED);
                             tvStatus.setText(msg);
                         }
                     } catch (Exception e) {
-                        tvStatus.setTextColor(0xFFFF0000);
+                        tvStatus.setTextColor(Color.RED);
                         tvStatus.setText("Ошибка парсинга ответа");
                     }
                 });
@@ -158,12 +187,14 @@ public class MainActivity extends Activity {
                 launchBotUI();
             } else {
                 tvStatus.setText("Нужно разрешение на оверлей");
-                tvStatus.setTextColor(0xFFFF0000);
+                tvStatus.setTextColor(Color.RED);
             }
         }
     }
 
-    private String getDeviceId() {
+    // Переименовали метод, чтобы не конфликтовать с системным
+    private String fetchMyDeviceId() {
         return Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
     }
 }
+
