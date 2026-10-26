@@ -1,6 +1,5 @@
 package com.ztai.app;
 
-import android.app.Activity;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
@@ -25,6 +24,7 @@ public class BotService extends Service {
     private Handler handler;
     private boolean isRunning = false;
     private Runnable botLoop;
+    
     private MediaProjection mediaProjection;
     private VirtualDisplay virtualDisplay;
     private ImageReader imageReader;
@@ -34,6 +34,7 @@ public class BotService extends Service {
     public void onCreate() {
         super.onCreate();
         handler = new Handler(Looper.getMainLooper());
+        
         WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
         DisplayMetrics metrics = new DisplayMetrics();
         wm.getDefaultDisplay().getMetrics(metrics);
@@ -50,25 +51,28 @@ public class BotService extends Service {
                 startBot();
             } else if (action.equals("stop")) {
                 stopBot();
+            } else if (action.equals("set_projection")) {
+                int resultCode = intent.getIntExtra("result_code", 0);
+                Intent data = intent.getParcelableExtra("data");
+                setupMediaProjection(resultCode, data);
             }
         }
         return START_STICKY;
     }
 
-    // Метод для установки MediaProjection (вызывается из MainActivity)
-    public void setMediaProjection(MediaProjection projection) {
-        this.mediaProjection = projection;
-        setupVirtualDisplay();
-    }
-
-    private void setupVirtualDisplay() {
-        if (mediaProjection == null) return;
+    private void setupMediaProjection(int resultCode, Intent data) {
+        if (data == null) return;
+        MediaProjectionManager mpm = (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
+        mediaProjection = mpm.getMediaProjection(resultCode, data);
         
-        imageReader = ImageReader.newInstance(screenWidth, screenHeight, PixelFormat.RGBA_8888, 2);
-        virtualDisplay = mediaProjection.createVirtualDisplay("ZTaiScreen",
-                screenWidth, screenHeight, screenDpi,
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                imageReader.getSurface(), null, handler);
+        if (mediaProjection != null) {
+            imageReader = ImageReader.newInstance(screenWidth, screenHeight, PixelFormat.RGBA_8888, 2);
+            virtualDisplay = mediaProjection.createVirtualDisplay("ZTaiScreen",
+                    screenWidth, screenHeight, screenDpi,
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                    imageReader.getSurface(), null, handler);
+            System.out.println("ZTai: MediaProjection готов, экран захвачен.");
+        }
     }
 
     private void startBot() {
@@ -80,10 +84,13 @@ public class BotService extends Service {
             public void run() {
                 if (!isRunning) return;
 
-                // ТЕСТ: Делаем скриншот и сохраняем его
+                // 1. Делаем скриншот (чтобы бот "видел")
                 captureScreen();
 
-                // Повторяем цикл каждые 2 секунды
+                // 2. ТЕСТ: Тап по центру экрана (в будущем — координаты кнопок Brawl Stars)
+                TapService.tap(screenWidth / 2f, screenHeight / 2f);
+
+                // Повторяем каждые 2 секунды
                 handler.postDelayed(this, 2000);
             }
         };
@@ -105,9 +112,8 @@ public class BotService extends Service {
 
             Bitmap bitmap = Bitmap.createBitmap(screenWidth + rowPadding / pixelStride, screenHeight, Bitmap.Config.ARGB_8888);
             bitmap.copyPixelsFromBuffer(buffer);
-
-            // Здесь в будущем будет анализ картинки (поиск врагов)
-            // Пока просто логируем, что скриншот сделан
+            
+            // ЗДЕСЬ В БУДУЩЕМ БУДЕТ АНАЛИЗ КАРТИНКИ (поиск врагов, HP и т.д.)
             System.out.println("ZTai: Скриншот сделан! Размер: " + bitmap.getWidth() + "x" + bitmap.getHeight());
 
         } catch (Exception e) {
@@ -121,9 +127,6 @@ public class BotService extends Service {
         isRunning = false;
         if (handler != null && botLoop != null) {
             handler.removeCallbacks(botLoop);
-        }
-        if (virtualDisplay != null) {
-            virtualDisplay.release();
         }
     }
 
