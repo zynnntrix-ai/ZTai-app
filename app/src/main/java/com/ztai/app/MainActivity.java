@@ -298,23 +298,10 @@ public class MainActivity extends Activity {
         title.setTextColor(Color.WHITE);
         title.setPadding(0, 0, 0, 20);
         contentLayout.addView(title);
-
-        String infoText = "ZTai — это умный бот для Brawl Stars.\n\n" +
-                "✅ Поддерживает любого бойца\n" +
-                "✅ Умная логика боя\n" +
-                "✅ Работает в фоне\n" +
-                "✅ Простой интерфейс\n\n" +
-                "Как играть:\n" +
-                "1. Включите все разрешения в 'Настройках'.\n" +
-                "2. Нажмите ЗАПУСТИТЬ на главной.\n" +
-                "3. Откройте Brawl Stars.\n" +
-                "4. Бот начнет играть автоматически.";
-        
         TextView tvInfo = new TextView(this);
-        tvInfo.setText(infoText);
+        tvInfo.setText("ZTai — умный бот для Brawl Stars.\n\n✅ Умная логика\n✅ Работает в фоне\n✅ Простой интерфейс\n\nКак играть:\n1. Включите разрешения.\n2. Нажмите ЗАПУСТИТЬ.\n3. Разрешите захват экрана.\n4. Откройте игру.");
         tvInfo.setTextColor(Color.LTGRAY);
         tvInfo.setTextSize(14);
-        tvInfo.setLineSpacing(1.2f, 1.2f);
         contentLayout.addView(tvInfo);
     }
 
@@ -326,7 +313,6 @@ public class MainActivity extends Activity {
         title.setTextColor(Color.WHITE);
         title.setPadding(0, 0, 0, 20);
         contentLayout.addView(title);
-
         addStatCard("Время сессии", "00:00:00");
         addStatCard("Матчей сыграно", "0");
         addStatCard("Побед", "0");
@@ -342,21 +328,18 @@ public class MainActivity extends Activity {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         params.setMargins(0, 0, 0, 15);
         card.setLayoutParams(params);
-
         TextView tvLabel = new TextView(this);
         tvLabel.setText(label);
         tvLabel.setTextColor(Color.LTGRAY);
         tvLabel.setTextSize(16);
         tvLabel.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
         card.addView(tvLabel);
-
         TextView tvValue = new TextView(this);
         tvValue.setText(value);
         tvValue.setTextColor(Color.parseColor("#00D4FF"));
         tvValue.setTextSize(18);
         tvValue.setTypeface(null, Typeface.BOLD);
         card.addView(tvValue);
-
         contentLayout.addView(card);
     }
 
@@ -369,45 +352,19 @@ public class MainActivity extends Activity {
         title.setPadding(0, 0, 0, 20);
         contentLayout.addView(title);
 
-        TextView permTitle = new TextView(this);
-        permTitle.setText("Что нужно включить на телефоне:");
-        permTitle.setTextColor(Color.WHITE);
-        permTitle.setTextSize(16);
-        permTitle.setPadding(0, 0, 0, 10);
-        contentLayout.addView(permTitle);
-
         boolean hasOverlay = Settings.canDrawOverlays(this);
         boolean hasAccessibility = isAccessibilityServiceEnabled(this, TapService.class);
 
-        addClickableSettingItem("Показ поверх окон", hasOverlay ? "Включено ✅" : "Выключено ❌ (Нажмите)", 
+        addClickableSettingItem("Показ поверх окон", hasOverlay ? "Включено ✅" : "Выключено ❌", 
                 hasOverlay ? Color.GREEN : Color.RED, 
-                () -> {
-                    Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()));
-                    startActivity(intent);
-                });
+                () -> startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()))));
 
-        addClickableSettingItem("Служба доступности", hasAccessibility ? "Включено ✅" : "Выключено ❌ (Нажмите)", 
+        addClickableSettingItem("Служба доступности", hasAccessibility ? "Включено ✅" : "Выключено ❌", 
                 hasAccessibility ? Color.GREEN : Color.RED, 
-                () -> {
-                    Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
-                    startActivity(intent);
-                });
+                () -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
 
         addClickableSettingItem("Оптимизация батареи", "Отключить для стабильности", Color.LTGRAY, 
-                () -> {
-                    Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
-                    startActivity(intent);
-                });
-
-        TextView styleTitle = new TextView(this);
-        styleTitle.setText("\nПлейстайл:");
-        styleTitle.setTextColor(Color.WHITE);
-        styleTitle.setTextSize(16);
-        styleTitle.setPadding(0, 20, 0, 10);
-        contentLayout.addView(styleTitle);
-
-        addSettingsItem("Rush (Агрессивный)", "Идти в центр", false);
-        addSettingsItem("Showdown Survivor", "Выживать до конца", true);
+                () -> startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)));
 
         Button btnReset = new Button(this);
         btnReset.setText("Сбросить ключ");
@@ -431,64 +388,26 @@ public class MainActivity extends Activity {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         params.setMargins(0, 0, 0, 15);
         row.setLayoutParams(params);
-
         LinearLayout textLayout = new LinearLayout(this);
         textLayout.setOrientation(LinearLayout.VERTICAL);
         textLayout.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-
         TextView tvTitle = new TextView(this);
         tvTitle.setText(title);
         tvTitle.setTextColor(Color.WHITE);
         tvTitle.setTextSize(16);
         textLayout.addView(tvTitle);
-
         TextView tvSub = new TextView(this);
         tvSub.setText(subtitle);
         tvSub.setTextColor(subtitleColor);
         tvSub.setTextSize(12);
         textLayout.addView(tvSub);
-
         row.addView(textLayout);
         row.setOnClickListener(v -> onClick.run());
-
-        contentLayout.addView(row);
-    }
-
-    private void addSettingsItem(String title, String subtitle, boolean isChecked) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setPadding(0, 15, 0, 15);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-
-        LinearLayout textLayout = new LinearLayout(this);
-        textLayout.setOrientation(LinearLayout.VERTICAL);
-        textLayout.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-
-        TextView tvTitle = new TextView(this);
-        tvTitle.setText(title);
-        tvTitle.setTextColor(Color.WHITE);
-        tvTitle.setTextSize(16);
-        textLayout.addView(tvTitle);
-
-        TextView tvSub = new TextView(this);
-        tvSub.setText(subtitle);
-        tvSub.setTextColor(Color.GRAY);
-        tvSub.setTextSize(12);
-        textLayout.addView(tvSub);
-
-        row.addView(textLayout);
-
-        Switch sw = new Switch(this);
-        sw.setChecked(isChecked);
-        row.addView(sw);
-
         contentLayout.addView(row);
     }
 
     private void launchBotUI() {
-        startService(new Intent(this, BotService.class));
         startService(new Intent(this, FloatingService.class));
-
         projectionManager = (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
         Intent intent = projectionManager.createScreenCaptureIntent();
         startActivityForResult(intent, REQUEST_MEDIA_PROJECTION);
@@ -508,6 +427,8 @@ public class MainActivity extends Activity {
                 serviceIntent.putExtra("result_code", resultCode);
                 serviceIntent.putExtra("data", data);
                 startService(serviceIntent);
+            } else {
+                Toast.makeText(this, "Без разрешения на экран бот не сможет работать", Toast.LENGTH_LONG).show();
             }
         }
     }

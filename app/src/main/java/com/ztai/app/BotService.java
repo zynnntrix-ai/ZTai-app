@@ -68,7 +68,6 @@ public class BotService extends Service {
         if (intent != null && intent.getStringExtra("action") != null) {
             String action = intent.getStringExtra("action");
             if (action.equals("start")) {
-                startForegroundServiceWithNotification();
                 startBot();
             } else if (action.equals("stop")) {
                 stopBot();
@@ -78,12 +77,13 @@ public class BotService extends Service {
                 int resultCode = intent.getIntExtra("result_code", 0);
                 Intent data = intent.getParcelableExtra("data");
                 setupMediaProjection(resultCode, data);
+                startForegroundWithNotification(); // Запускаем foreground ПОСЛЕ получения разрешения
             }
         }
         return START_STICKY;
     }
 
-    private void startForegroundServiceWithNotification() {
+    private void startForegroundWithNotification() {
         Notification notification = new Notification.Builder(this, CHANNEL_ID)
                 .setContentTitle("ZTai работает")
                 .setContentText("Бот активен и готов к игре")
@@ -116,6 +116,7 @@ public class BotService extends Service {
             public void run() {
                 if (!isRunning) return;
                 captureScreen();
+                // TapService.tap(screenWidth / 2f, screenHeight / 2f); // Временно отключено для теста
                 handler.postDelayed(this, 2000);
             }
         };
@@ -124,10 +125,7 @@ public class BotService extends Service {
     }
 
     private void captureScreen() {
-        if (imageReader == null) {
-            System.out.println("ZTai: imageReader null (нет разрешения на экран)");
-            return;
-        }
+        if (imageReader == null) return;
         Image image = imageReader.acquireLatestImage();
         if (image == null) return;
 
@@ -140,9 +138,7 @@ public class BotService extends Service {
 
             Bitmap bitmap = Bitmap.createBitmap(screenWidth + rowPadding / pixelStride, screenHeight, Bitmap.Config.ARGB_8888);
             bitmap.copyPixelsFromBuffer(buffer);
-            
-            System.out.println("ZTai: Скриншот сделан! Размер: " + bitmap.getWidth() + "x" + bitmap.getHeight());
-
+            System.out.println("ZTai: Скриншот сделан!");
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
